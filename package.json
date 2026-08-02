@@ -1,6 +1,6 @@
 {
   "name": "@aderaaaa/ai-sdk",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "OpenAI 兼容的极简 AI SDK，支持流式响应与工具调用",
   "type": "module",
   "main": "./dist/index.js",
