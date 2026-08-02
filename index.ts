@@ -7,13 +7,13 @@
  * 完整的 multi-turn tool-use 循环：发送问题 → LLM 触发工具调用 →
  * 执行工具回推 → LLM 给出最终答案。
  */
-import { ai } from "./src/index"
+import { aiSdk } from "./src/index"
 import dotenv from "dotenv"
 
 dotenv.config()
 
 
-const config1 = ai.defineConfig({
+const config1 = aiSdk.defineConfig({
   modelId: "deepseek-v4-flash",
   apiURL: "https://api.deepseek.com/chat/completions",
   apiKey: process.env.API_KEY ?? "",
@@ -24,7 +24,7 @@ const config1 = ai.defineConfig({
   timeout: 30_000, // 单次请求超时，毫秒
 })
 
-const add = ai.defineTool({
+const add = aiSdk.defineTool({
   name: "add",
   description: "整数加法",
   input: {
@@ -34,11 +34,11 @@ const add = ai.defineTool({
   output: (a: number, b: number) => a + b,
 })
 
-const ai1 = ai.defineai(config1, [add])
+const ai1 = aiSdk.defineAi(config1, [add])
 
-const messages: ai.Messages = [
+const messages: aiSdk.Messages = [
   { role: "system", content: "你是一个助手" },
-  { role: "user", content: "测试：输出一段文字，调用一个工具" },
+  { role: "user", content: "生成500字小说以供测试" },
 ]
 
 while (true) {

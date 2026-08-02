@@ -1,1 +1,1 @@
-export { ai, AIError } from "./ai"
+export { aiSdk, AIError } from "./aiSdk"

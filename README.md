@@ -4,7 +4,7 @@ OpenAI 兼容的极简 AI SDK。零运行时依赖，类型安全，支持流式
 
 ## 特性
 
-- 🪶 **极简 API**：`defineConfig` / `defineTool` / `defineai` 三件套
+- 🪶 **极简 API**：`defineConfig` / `defineTool` / `defineAi` 三件套
 - 🔌 **OpenAI 兼容**：任何实现了 OpenAI Chat Completions `/v1/chat/completions` 的服务都能用（OpenAI / DeepSeek / 智谱 / Ollama / vLLM / llama.cpp 等）
 - 🌊 **流式 / 非流式**：通过 `stream` 配置切换
 - 🛠️ **工具调用**：自动处理 `tool_calls` 往返，参数解析、`execute()` 自动绑定
@@ -25,10 +25,10 @@ bun add @aderaaaa/ai-sdk
 ## 快速开始
 
 ```ts
-import { ai } from "@aderaaaa/ai-sdk"
+import { aiSdk } from "@aderaaaa/ai-sdk"
 
 // 1. 定义配置
-const config = ai.defineConfig({
+const config = aiSdk.defineConfig({
   modelId: "gpt-4o-mini",
   apiURL: "https://api.openai.com/v1",
   apiKey: process.env.OPENAI_API_KEY!,
@@ -39,7 +39,7 @@ const config = ai.defineConfig({
 })
 
 // 2. 定义工具（可选）
-const add = ai.defineTool({
+const add = aiSdk.defineTool({
   name: "add",
   description: "整数加法",
   input: {
@@ -49,11 +49,11 @@ const add = ai.defineTool({
   output: (a: number, b: number) => a + b,
 })
 
-// 3. 创建 ai 实例
-const ai1 = ai.defineai(config, [add])
+// 3. 创建 aiSdk 实例
+const ai1 = aiSdk.defineAi(config, [add])
 
 // 4. 多轮 tool-use 循环
-const messages: ai.Messages = [
+const messages: aiSdk.Messages = [
   { role: "system", content: "你是一个会用工具的计算助手" },
   { role: "user", content: "3 加 5 等于多少？" },
 ]
@@ -90,7 +90,7 @@ while (true) {
 
 ## API
 
-### `ai.defineConfig(config)`
+### `aiSdk.defineConfig(config)`
 
 合并默认值并校验必填字段。
 
@@ -106,7 +106,7 @@ while (true) {
 | `customBodyConfig` | `Record<string, unknown>` | `{}` | 自定义请求 body 字段，会 merge 到 SDK 默认 body 之后（同名字段以自定义为准，可覆盖 `model` / `messages` / `stream` / `tools`） |
 | `customHeaderConfig` | `Record<string, unknown>` | `{}` | 自定义请求 header 字段，会 merge 到 SDK 默认 header 之后（同名字段以自定义为准，可覆盖 `Authorization` / `Content-Type`） |
 
-### `ai.defineTool(def)`
+### `aiSdk.defineTool(def)`
 
 定义工具。`def` 含字段：
 
@@ -126,9 +126,9 @@ while (true) {
 
 返回的 `ToolInstance` 有 `execute(args?)` 与 `toJSON()` 方法。
 
-### `ai.defineai(config, tools?)`
+### `aiSdk.defineAi(config, tools?)`
 
-创建 ai 实例。`tools` 默认为空数组。
+创建 aiSdk 实例。`tools` 默认为空数组。
 
 返回的对象有 `request(messages)` 异步方法：
 
@@ -171,15 +171,15 @@ while (true) {
 ## 类型
 
 ```ts
-import type { ai } from "@aderaaaa/ai-sdk"
+import type { aiSdk } from "@aderaaaa/ai-sdk"
 
-type M = ai.Message   // = SystemMessage | UserMessage | AssistantMessage | ToolMessage
-type Ms = ai.Messages // = Message[]
-type R = ai.Result["streaming"]
-type R2 = ai.Result["non-streaming"]
+type M = aiSdk.Message   // = SystemMessage | UserMessage | AssistantMessage | ToolMessage
+type Ms = aiSdk.Messages // = Message[]
+type R = aiSdk.Result["streaming"]
+type R2 = aiSdk.Result["non-streaming"]
 ```
 
-`ai` 是 TypeScript namespace，既是值（含 `defineConfig` / `defineTool` / `defineai` 函数），又是类型容器（含 `Message` / `Messages` / `Result` 等）。
+`aiSdk` 是 TypeScript namespace，既是值（含 `defineConfig` / `defineTool` / `defineAi` 函数），又是类型容器（含 `Message` / `Messages` / `Result` 等）。
 
 ## 错误处理
 

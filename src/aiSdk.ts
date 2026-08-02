@@ -19,10 +19,10 @@ export class AIError extends Error {
 }
 
 // ============================================================
-// namespace ai —— 既是值又是类型的统一入口
+// namespace aiSdk —— 既是值又是类型的统一入口
 // ============================================================
 
-export namespace ai {
+export namespace aiSdk {
   // -------------------- 类型定义 --------------------
 
   /** JSON Schema 基础类型 */
@@ -234,7 +234,7 @@ export namespace ai {
    *
    * @example
    * ```ts
-   * const add = ai.defineTool({
+   * const add = aiSdk.defineTool({
    *   name: "add",                  // 可选；默认取 output.name
    *   input: {
    *     a: { type: "number", description: "first number" },
@@ -296,13 +296,13 @@ export namespace ai {
   }
 
   /**
-   * 创建 ai 实例。传入 config 与工具列表。
+   * 创建 aiSdk 实例。传入 config 与工具列表。
    * 返回的实例有 request 方法。
    *
    * 注意：tools 元素的类型参数会被擦除（existential），
-   * 单个 tool 自身保留 input/output 推断，但传入 defineai 后视为公共基型。
+   * 单个 tool 自身保留 input/output 推断，但传入 defineAi 后视为公共基型。
    */
-  export function defineai(
+  export function defineAi(
     config: ResolvedConfig,
     tools: ReadonlyArray<ToolInstance<any, any>> = [],
   ): {

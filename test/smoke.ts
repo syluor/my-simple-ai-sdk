@@ -4,7 +4,7 @@
  *
  * 运行: bun test/smoke.ts
  */
-import { ai, AIError } from "../src/index"
+import { aiSdk, AIError } from "../src/index"
 
 let pass = 0
 let fail = 0
@@ -84,14 +84,14 @@ async function testNonStreamingWithTool() {
   })
 
   try {
-    const config = ai.defineConfig({
+    const config = aiSdk.defineConfig({
       modelId: "test-model",
       apiURL: server.url,
       apiKey: "test-key",
       stream: false,
       retryTimes: 0,
     })
-    const add = ai.defineTool({
+    const add = aiSdk.defineTool({
       name: "add",
       description: "加法",
       input: {
@@ -100,11 +100,11 @@ async function testNonStreamingWithTool() {
       },
       output: (a: number, b: number) => a + b,
     })
-    const inst = ai.defineai(config, [add])
+    const inst = aiSdk.defineAi(config, [add])
 
-    assert(inst !== undefined, "defineai 返回实例")
+    assert(inst !== undefined, "defineAi 返回实例")
 
-    const messages: ai.Messages = [
+    const messages: aiSdk.Messages = [
       { role: "user", content: "请用加法工具算 3+5" },
     ]
 
@@ -157,23 +157,24 @@ async function testStreamingContent() {
   })
 
   try {
-    const config = ai.defineConfig({
+    const config = aiSdk.defineConfig({
       modelId: "test-model",
       apiURL: server.url,
       apiKey: "test-key",
       stream: true,
       retryTimes: 0,
     })
-    const inst = ai.defineai(config, [])
+    const inst = aiSdk.defineAi(config, [])
     const r = await inst.request([{ role: "user", content: "hi" }])
-
-    assert(r.message.content === "你好，世界", "累积内容正确")
-    assert(r.message.role === "assistant", "role 正确")
 
     const consumed: string[] = []
     for await (const chunk of r.stream) consumed.push(chunk)
     assert(consumed.length === 3, "stream 回放了 3 个 chunks")
     assert(consumed.join("") === "你好，世界", "stream 内容拼接正确")
+
+    const msg = await r.getMessage()
+    assert(msg.content === "你好，世界", "累积内容正确")
+    assert(msg.role === "assistant", "role 正确")
   } finally {
     server.close()
   }
@@ -193,14 +194,14 @@ async function testStreamingToolCall() {
   })
 
   try {
-    const config = ai.defineConfig({
+    const config = aiSdk.defineConfig({
       modelId: "m",
       apiURL: server.url,
       apiKey: "k",
       stream: true,
       retryTimes: 0,
     })
-    const add = ai.defineTool({
+    const add = aiSdk.defineTool({
       name: "add",
       input: {
         a: { type: "number", description: "" },
@@ -208,16 +209,18 @@ async function testStreamingToolCall() {
       },
       output: (a: number, b: number) => a + b,
     })
-    const inst = ai.defineai(config, [add])
+    const inst = aiSdk.defineAi(config, [add])
     const r = await inst.request([{ role: "user", content: "" }])
 
-    assert(r.requiredTools !== undefined, "流式也解析出 requiredTools")
-    assert(r.requiredTools![0]!.tool_call_id === "call_x", "流式 tool_call_id 正确")
-    assert(r.requiredTools![0]!.args.a === 4, "分片 arguments 解析 a=4")
-    assert(r.requiredTools![0]!.args.b === 10, "分片 arguments 解析 b=10")
-    assert(r.message.tool_calls?.[0]!.function.arguments === '{"a":4,"b":10}', "完整 arguments JSON 拼接正确")
+    const requiredTools = await r.getRequiredTools()
+    const msg = await r.getMessage()
+    assert(requiredTools !== undefined, "流式也解析出 requiredTools")
+    assert(requiredTools![0]!.tool_call_id === "call_x", "流式 tool_call_id 正确")
+    assert(requiredTools![0]!.args.a === 4, "分片 arguments 解析 a=4")
+    assert(requiredTools![0]!.args.b === 10, "分片 arguments 解析 b=10")
+    assert(msg.tool_calls?.[0]!.function.arguments === '{"a":4,"b":10}', "完整 arguments JSON 拼接正确")
 
-    const ret = await r.requiredTools![0]!.tool.execute()
+    const ret = await requiredTools![0]!.tool.execute()
     assert(ret === 14, "execute(分片 args) 返回 14")
   } finally {
     server.close()
@@ -237,7 +240,7 @@ async function testRetry() {
   })
 
   try {
-    const config = ai.defineConfig({
+    const config = aiSdk.defineConfig({
       modelId: "m",
       apiURL: server.url,
       apiKey: "k",
@@ -246,7 +249,7 @@ async function testRetry() {
       exponentialBackoff: true,
       timeout: 5000,
     })
-    const inst = ai.defineai(config, [])
+    const inst = aiSdk.defineAi(config, [])
     const r = await inst.request([{ role: "user", content: "" }])
     assert(attempts === 3, `前 2 次 500，第 3 次成功（实际 ${attempts}）`)
     assert(r.message.content === "ok", "最终拿到 200 内容")
@@ -262,7 +265,7 @@ async function testAllFail() {
   console.log("\n[T5] 全部重试失败抛 AIError")
   const server = await startMockServer(async () => new Response("err", { status: 500 }))
   try {
-    const config = ai.defineConfig({
+    const config = aiSdk.defineConfig({
       modelId: "m",
       apiURL: server.url,
       apiKey: "k",
@@ -271,7 +274,7 @@ async function testAllFail() {
       exponentialBackoff: false,
       timeout: 5000,
     })
-    const inst = ai.defineai(config, [])
+    const inst = aiSdk.defineAi(config, [])
     let threw: unknown
     try {
       await inst.request([{ role: "user", content: "" }])
@@ -293,7 +296,7 @@ async function testToolNameMissing() {
   let threw: unknown
   try {
     // 匿名箭头函数赋给对象属性，name 自动是 "output"，被 SDK 视为无效
-    ai.defineTool({
+    aiSdk.defineTool({
       input: { x: { type: "number", description: "" } },
       output: (x: number) => x,
     })
@@ -319,7 +322,7 @@ async function testCustomConfig() {
   })
 
   try {
-    const config = ai.defineConfig({
+    const config = aiSdk.defineConfig({
       modelId: "m",
       apiURL: server.url,
       apiKey: "k",
@@ -335,7 +338,7 @@ async function testCustomConfig() {
         Authorization: "Bearer CUSTOM_TOKEN", // 应该覆盖默认
       },
     })
-    const inst = ai.defineai(config, [])
+    const inst = aiSdk.defineAi(config, [])
     await inst.request([{ role: "user", content: "" }])
 
     assert(receivedBody.temperature === 0.7, "customBody.temperature 被合并")
