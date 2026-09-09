@@ -212,15 +212,29 @@ export namespace aiSdk {
   }
 
   /**
-   * 定义配置。合并默认值并校验必填字段。
+   * 定义并校验全局配置，应用默认参数。
+   * 必须提供 modelId, apiURL 和 apiKey。
    *
-   * 各家 OpenAI 兼容服务的 API 文档：
-   *
+   * 各家 OpenAI 兼容服务的 API 文档参考：
    * - OpenAI: https://platform.openai.com/docs/api-reference/chat
    * - DeepSeek: https://api-docs.deepseek.com/
    * - 智谱 (ZhipuAI / GLM): https://docs.bigmodel.cn/cn/guide/develop/openai/introduction
    * - Kimi (Moonshot): https://platform.moonshot.cn/docs/api/chat
    * - 通义千问 (DashScope): https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-chat-completions
+   *
+   * @param config - 用户提供的基础配置对象，包含模型参数、请求重试与超时设置等。
+   * @returns 合并了默认值（如流式请求、重试次数等）并校验通过的完整配置对象。
+   * @throws {AIError} 当缺少 modelId、apiURL 或 apiKey 时抛出错误。
+   *
+   * @example
+   * ```ts
+   * const config = aiSdk.defineConfig({
+   *   modelId: "gpt-4o-mini",
+   *   apiURL: "https://api.openai.com/v1/chat/completions",
+   *   apiKey: "YOUR_API_KEY",
+   *   stream: true,
+   * });
+   * ```
    */
   export function defineConfig(config: Config): ResolvedConfig {
     if (!config.modelId) throw new AIError("modelId is required")
@@ -230,18 +244,25 @@ export namespace aiSdk {
   }
 
   /**
-   * 定义工具。
+   * 定义一个供大模型调用的工具（Function Calling）。
+   * 自动将 JS/TS 函数及其参数定义转换为 OpenAI 兼容的工具 Schema。
+   *
+   * @param def - 工具定义对象，包含参数结构(input)、执行逻辑(output)及元数据。
+   * @returns 一个工具实例，包含执行方法、内部状态及转换为 JSON Schema 的 toJSON 方法。
+   * @throws {AIError} 当未提供显式 name，且无法从 output 函数推断出名称时抛出错误。
    *
    * @example
    * ```ts
-   * const add = aiSdk.defineTool({
-   *   name: "add",                  // 可选；默认取 output.name
+   * const getWeather = aiSdk.defineTool({
+   *   name: "get_weather",
+   *   description: "获取指定城市的当前天气情况",
    *   input: {
-   *     a: { type: "number", description: "first number" },
-   *     b: { type: "number", description: "second number" },
+   *     city: { type: "string", description: "需要查询天气的城市名称" },
    *   },
-   *   output: (a: number, b: number) => a + b,
-   * })
+   *   output: async (city: string) => {
+   *     return `天气晴朗，气温 25°C，位于 ${city}`;
+   *   },
+   * });
    * ```
    */
   export function defineTool<
@@ -296,11 +317,30 @@ export namespace aiSdk {
   }
 
   /**
-   * 创建 aiSdk 实例。传入 config 与工具列表。
-   * 返回的实例有 request 方法。
+   * 核心入口：创建 AI 客户端实例，可绑定多个全局工具。
+   * 返回的实例提供 `request` 方法用于发起对话请求，内部处理了请求合并、流式响应解析与工具调用的底层细节。
    *
    * 注意：tools 元素的类型参数会被擦除（existential），
    * 单个 tool 自身保留 input/output 推断，但传入 defineAi 后视为公共基型。
+   *
+   * @param config - 经 `defineConfig` 解析后的全局配置。
+   * @param tools - 可选参数，绑定到此实例的工具列表（由 `defineTool` 创建）。
+   * @returns 包含 `request` 方法的客户端对象。
+   *
+   * @example
+   * ```ts
+   * const ai = aiSdk.defineAi(config, [getWeather]);
+   * 
+   * // 发起请求
+   * const result = await ai.request([
+   *   { role: "user", content: "北京天气怎么样？" }
+   * ]);
+   * 
+   * // 如果 config.stream 为 true，可以迭代数据流：
+   * for await (const chunk of (result as any).stream) {
+   *   process.stdout.write(chunk);
+   * }
+   * ```
    */
   export function defineAi(
     config: ResolvedConfig,
@@ -492,12 +532,12 @@ export namespace aiSdk {
         const toolCalls: AssistantToolCall[] | undefined =
           toolCallsMap.size > 0
             ? [...toolCallsMap.entries()]
-                .sort(([a], [b]) => a - b)
-                .map(([, entry]) => ({
-                  id: entry.id,
-                  type: "function" as const,
-                  function: { name: entry.name, arguments: entry.argsBuf },
-                }))
+              .sort(([a], [b]) => a - b)
+              .map(([, entry]) => ({
+                id: entry.id,
+                type: "function" as const,
+                function: { name: entry.name, arguments: entry.argsBuf },
+              }))
             : undefined
 
         message = {
