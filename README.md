@@ -11,6 +11,7 @@ OpenAI 兼容的极简 AI SDK。零运行时依赖，类型安全，支持流式
 - 🔁 **重试 + 指数退避**：网络抖动 / 5xx 自动重试
 - 🧷 **类型安全**：完全用 TypeScript 编写，类型推断友好
 - 📦 **零依赖**：仅依赖 Node 18+ 内置 `fetch`
+- 🧷 **手动管理上下文**：更灵活
 
 ## 安装
 
@@ -25,18 +26,18 @@ bun add @aderaaaa/ai-sdk
 ## 快速开始
 
 ```ts
-import { aiSdk } from "@aderaaaa/ai-sdk"
+import { aiSdk } from "@aderaaaa/ai-sdk";
 
 // 1. 定义配置
 const config = aiSdk.defineConfig({
   modelId: "gpt-4o-mini",
   apiURL: "https://api.openai.com/v1",
   apiKey: process.env.OPENAI_API_KEY!,
-  stream: true,              // 可选，默认 true
-  retryTimes: 3,             // 可选，默认 3
-  exponentialBackoff: true,  // 可选，默认 true
-  timeout: 30_000,           // 可选，默认 30000ms
-})
+  stream: true, // 可选，默认 true
+  retryTimes: 3, // 可选，默认 3
+  exponentialBackoff: true, // 可选，默认 true
+  timeout: 30_000, // 可选，默认 30000ms
+});
 
 // 2. 定义工具（可选）
 const add = aiSdk.defineTool({
@@ -47,44 +48,44 @@ const add = aiSdk.defineTool({
     b: { type: "number", description: "第二个加数", required: false },
   },
   output: (a: number, b: number) => a + b,
-})
+});
 
 // 3. 创建 aiSdk 实例
-const ai1 = aiSdk.defineAi(config, [add])
+const ai1 = aiSdk.defineAi(config, [add]);
 
 // 4. 多轮 tool-use 循环
 const messages: aiSdk.Messages = [
   { role: "system", content: "你是一个会用工具的计算助手" },
   { role: "user", content: "3 加 5 等于多少？" },
-]
+];
 
 while (true) {
-  const result = await ai1.request(messages)
+  const result = await ai1.request(messages);
 
   // 真·实时流式输出（边到边吐）
   for await (const chunk of result.stream) {
-    process.stdout.write(chunk)
+    process.stdout.write(chunk);
   }
 
-  messages.push(await result.getMessage())
+  messages.push(await result.getMessage());
 
   // LLM 触发了工具调用：执行工具，回推结果，继续循环
-  const requiredTools = await result.getRequiredTools()
+  const requiredTools = await result.getRequiredTools();
   if (requiredTools && requiredTools.length > 0) {
     for (const rt of requiredTools) {
-      const ret = await rt.tool.execute()  // 已绑定 args，无参调用
+      const ret = await rt.tool.execute(); // 已绑定 args，无参调用
       messages.push({
         role: "tool",
         tool_call_id: rt.tool_call_id,
         content: String(ret),
-      })
+      });
     }
-    continue
+    continue;
   }
 
   // 否则：拿到最终答案
-  console.log()
-  break
+  console.log();
+  break;
 }
 ```
 
@@ -94,17 +95,17 @@ while (true) {
 
 合并默认值并校验必填字段。
 
-| 字段 | 类型 | 默认 | 说明 |
-|---|---|---|---|
-| `modelId` | `string` | — | **必填** 模型 ID |
-| `apiURL` | `string` | — | **必填** 完整的 chat completions endpoint URL（SDK 不做任何后缀拼接，如 `https://api.openai.com/v1/chat/completions`） |
-| `apiKey` | `string` | — | **必填** API Key |
-| `stream` | `boolean` | `true` | 是否流式 |
-| `retryTimes` | `number` | `3` | 失败重试次数 |
-| `exponentialBackoff` | `boolean` | `true` | 指数退避（每次失败等待时间翻倍） |
-| `timeout` | `number` | `30000` | 单次请求超时（毫秒） |
-| `customBodyConfig` | `Record<string, unknown>` | `{}` | 自定义请求 body 字段，会 merge 到 SDK 默认 body 之后（同名字段以自定义为准，可覆盖 `model` / `messages` / `stream` / `tools`） |
-| `customHeaderConfig` | `Record<string, unknown>` | `{}` | 自定义请求 header 字段，会 merge 到 SDK 默认 header 之后（同名字段以自定义为准，可覆盖 `Authorization` / `Content-Type`） |
+| 字段                 | 类型                      | 默认    | 说明                                                                                                                           |
+| -------------------- | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `modelId`            | `string`                  | —       | **必填** 模型 ID                                                                                                               |
+| `apiURL`             | `string`                  | —       | **必填** 完整的 chat completions endpoint URL（SDK 不做任何后缀拼接，如 `https://api.openai.com/v1/chat/completions`）         |
+| `apiKey`             | `string`                  | —       | **必填** API Key                                                                                                               |
+| `stream`             | `boolean`                 | `true`  | 是否流式                                                                                                                       |
+| `retryTimes`         | `number`                  | `3`     | 失败重试次数                                                                                                                   |
+| `exponentialBackoff` | `boolean`                 | `true`  | 指数退避（每次失败等待时间翻倍）                                                                                               |
+| `timeout`            | `number`                  | `30000` | 单次请求超时（毫秒）                                                                                                           |
+| `customBodyConfig`   | `Record<string, unknown>` | `{}`    | 自定义请求 body 字段，会 merge 到 SDK 默认 body 之后（同名字段以自定义为准，可覆盖 `model` / `messages` / `stream` / `tools`） |
+| `customHeaderConfig` | `Record<string, unknown>` | `{}`    | 自定义请求 header 字段，会 merge 到 SDK 默认 header 之后（同名字段以自定义为准，可覆盖 `Authorization` / `Content-Type`）      |
 
 ### `aiSdk.defineTool(def)`
 
@@ -133,25 +134,28 @@ while (true) {
 返回的对象有 `request(messages)` 异步方法：
 
 - **流式**（默认）：返回 `StreamingResult`
+
   ```ts
   { stream: AsyncIterable<string>   // content delta 实时流，可重复消费
   , getMessage(): Promise<AssistantMessage>
   , getRequiredTools(): Promise<RequiredTool[] | undefined>
   }
   ```
+
   `stream` 是真·实时流，每个 delta 到达即 yield。`getMessage()` / `getRequiredTools()`
   是幂等的异步获取函数：首次调用会内部把流读完并缓存结果，之后调用（以及 `stream`
   的消费）都从缓存读。**调用顺序任意**——先消费 `stream` 边到边吐再 `await getMessage()`，
   或先 `await getMessage()`（内部 drain 流）再 `for await stream`（从缓存重放），都能工作。
 
   ```ts
-  const result = await ai1.request(messages)
+  const result = await ai1.request(messages);
   // 方式 A：先实时流式输出，再拿完整 message
-  for await (const chunk of result.stream) process.stdout.write(chunk)
-  messages.push(await result.getMessage())
+  for await (const chunk of result.stream) process.stdout.write(chunk);
+  messages.push(await result.getMessage());
   // 方式 B：只要完整结果，不关心过程
   // messages.push(await result.getMessage())
   ```
+
 - **非流式**（`stream: false`）：返回 `NonStreamingResult`
   ```ts
   { message: AssistantMessage
@@ -171,12 +175,12 @@ while (true) {
 ## 类型
 
 ```ts
-import type { aiSdk } from "@aderaaaa/ai-sdk"
+import type { aiSdk } from "@aderaaaa/ai-sdk";
 
-type M = aiSdk.Message   // = SystemMessage | UserMessage | AssistantMessage | ToolMessage
-type Ms = aiSdk.Messages // = Message[]
-type R = aiSdk.Result["streaming"]
-type R2 = aiSdk.Result["non-streaming"]
+type M = aiSdk.Message; // = SystemMessage | UserMessage | AssistantMessage | ToolMessage
+type Ms = aiSdk.Messages; // = Message[]
+type R = aiSdk.Result["streaming"];
+type R2 = aiSdk.Result["non-streaming"];
 ```
 
 `aiSdk` 是 TypeScript namespace，既是值（含 `defineConfig` / `defineTool` / `defineAi` 函数），又是类型容器（含 `Message` / `Messages` / `Result` 等）。
@@ -186,13 +190,13 @@ type R2 = aiSdk.Result["non-streaming"]
 SDK 自定义错误类 `AIError`：
 
 ```ts
-import { AIError } from "@aderaaaa/ai-sdk"
+import { AIError } from "@aderaaaa/ai-sdk";
 
 try {
-  await ai1.request(messages)
+  await ai1.request(messages);
 } catch (e) {
   if (e instanceof AIError) {
-    console.error("SDK 错误:", e.message, e.cause)
+    console.error("SDK 错误:", e.message, e.cause);
   }
 }
 ```
